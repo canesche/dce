@@ -8,7 +8,7 @@ Dead Code Elimination (DCE) using Range Analysis
 
 [Caio Vinícius Raposo Ribeiro - 2021679084](https://github.com/caioraposo)
 
-[Alexander Thomas Mol Holquist]()
+[Alexander Thomas Mol Holquist - 2018066255]()
 
 Instructor: [Fernando Magno Quintão Pereira](https://github.com/pronesto)
 

@@ -37,6 +37,7 @@ namespace {
             InterProceduralRA<Cousot>* ra;
             queue<BasicBlock::iterator> dead_instr;
             queue<BasicBlock::iterator> dead_branch;
+            queue<Instruction*> trivialDead;
             map<string, string> map_label;
         };
 }

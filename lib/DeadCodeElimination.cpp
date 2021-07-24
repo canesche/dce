@@ -38,10 +38,9 @@ namespace {
             
             const Value *v = &(*I);
             Range r = ra->getRange(v);
-
+            
             if (isInstructionTriviallyDead(&*I)) {
-                I->eraseFromParent();
-                InstructionsEliminated++;
+                trivialDead.push(&*I);
             } else if (ICmpInst *icmpInst = dyn_cast<ICmpInst>(&*I)) {
                 if (solveICmpInstruction(icmpInst)) {
                     dead_instr.push(I);
@@ -236,17 +235,31 @@ namespace {
             ReplaceInstWithInst(Old, New);
         }
 
-        // eliminate unreachable block from entry
-        EliminateUnreachableBlocks(F, nullptr, true);
+        if (change) {
+            // eliminate unreachable block from entry
+            EliminateUnreachableBlocks(F, nullptr, true);
 
-        // eliminate PHI-nodes with one operand
-        eliminate_phi_nodes(F);
-        
-        // remove simple blocks with only have unconditional branch 
-        eliminate_unconditional_branch(F);
+            // eliminate PHI-nodes with one operand
+            eliminate_phi_nodes(F);
+            
+            // remove simple blocks with only have unconditional branch 
+            eliminate_unconditional_branch(F);
+        }
     }
 
     void RADeadCodeElimination::eliminate_instructions() {
+        
+        Instruction *Inst;
+        while (!trivialDead.empty()) {
+            Inst = trivialDead.front();
+            trivialDead.pop();
+            if (!Inst->use_empty()) {
+                Inst->replaceAllUsesWith(UndefValue::get(Inst->getType()));
+            }
+            Inst->eraseFromParent();
+            InstructionsEliminated++;
+        }
+        
         BasicBlock::iterator I;
         while (!dead_instr.empty()) {
             I = dead_instr.front();
@@ -269,27 +282,33 @@ namespace {
 
         switch (I->getPredicate()){
             case CmpInst::ICMP_SLT: // r1 < r2
-                if (r1.getLower().sge(r2.getLower())) // r1.1 >= r2.1
+                if (r1.getLower().sge(r2.getUpper())) // r1.1 >= r2.2
                     return true;
                 break;
             case CmpInst::ICMP_SLE: // r1 <= r2
-                if (r1.getLower().sgt(r2.getLower())) // r1.1 > r2.1
+                if (r1.getLower().sgt(r2.getUpper())) // r1.1 > r2.2
                     return true;
                 break;
             case CmpInst::ICMP_SGT: // r1 > r2
-                if (r1.getUpper().sle(r2.getLower()))
+                if (r1.getUpper().sle(r2.getLower())) // r2.2 >= r1.1
                     return true;
                 break;
             case CmpInst::ICMP_SGE: // r1 >= r2
-                if (r1.getUpper().slt(r2.getLower()))
+                if (r1.getUpper().slt(r2.getLower())) // r2.2 > r1.1
                     return true;
                 break;
-            case CmpInst::ICMP_EQ: // r1 == r2
-                if (r2.getLower().slt(r1.getLower()) || r2.getUpper().sgt(r1.getUpper()))
+            case CmpInst::ICMP_EQ: // r1 == r2 
+                // r1.2 < r2.1 || r2.2 < r1.1
+                if (r1.getUpper().slt(r2.getLower()) || r2.getUpper().slt(r1.getLower())) { 
                     return true;
+                }
                 break;
             case CmpInst::ICMP_NE: // r1 != r2
                 // discutir com o grupo!!!
+                if (r1.getUpper().eq(r2.getUpper()) && r1.getLower().eq(r1.getUpper()) &&
+                    r2.getUpper().eq(r1.getLower())) {
+                    return true;
+                }
                 break;
             default:
                 return false;

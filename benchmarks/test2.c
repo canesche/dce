@@ -1,7 +1,7 @@
 int foo(int k) {
-  int i = 0;
-  if (k % 2) {
+  int i = 9 + 1;
+  /*if (k % 2) {
     i++;
-  }
-  return i & 1;
+  }*/
+  return i & 10;
 }

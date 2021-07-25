@@ -3,19 +3,20 @@ set -e
 # CONFIG WHERE YOUR LLVM INSTALL, REQUIRE VERSION COMPILE FROM GIT
 LLVM_INSTALL_DIR="/home/canesche/git/llvm-project/build/" # </path/to/llvm/>, if you use binary installation, you can leave empty this string 
 
-
-#ADDING BENCHMARKS WITH SPACE BETWEEN WORDS
-BENCH=(
-	test1 
-	test2 test3 test4 test5 
-	test6 
-	test7 
-	test8
-)
-
 # DON'T NEED CHANGE BELOW IF YOU COMPILE FROM GIT
 LLVM_OPT=$LLVM_INSTALL_DIR"/bin/opt" # </path/to/opt>
 CLANG=$LLVM_INSTALL_DIR"/bin/clang" # </path/to/clang>
+
+#ADDING BENCHMARKS WITH SPACE BETWEEN WORDS
+BENCH=(
+	#test1 
+	test2 
+	#test3 test4 test5 
+	#test6 
+	#test7 
+	#test8
+	#test200
+)
 
 # PATH LIBRARY
 PATH_LIB="build/lib/libRangeAnalysis.so"

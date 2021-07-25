@@ -32,6 +32,7 @@ namespace {
             bool runOnBasicBlock(Function::iterator &);
             bool solveICmpInstruction(ICmpInst* I);
             bool solveBinaryInst(BasicBlock::iterator I);
+            bool verify_equal(Range r1, Range r2);
         private:
             InterProceduralRA<Cousot>* ra;
             queue<Instruction*> dead_instr;

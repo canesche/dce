@@ -89,7 +89,6 @@ namespace {
         queue<BasicBlock*> Q;
         for (BasicBlock &bb : F) {
             count = 0;
-            
             for (BasicBlock::iterator I = bb.begin(), IEnd = bb.end(); I != IEnd; ++I) {
                 count++;
             }
@@ -145,24 +144,49 @@ namespace {
         return change;
     }
 
+    bool RADeadCodeElimination::verify_equal(Range r1, Range r2) {
+        return r1.getUpper().eq(r2.getUpper()) && 
+               r1.getLower().eq(r1.getUpper()) &&
+               r2.getLower().eq(r2.getUpper());
+    }
+
     bool RADeadCodeElimination::solveBinaryInst(BasicBlock::iterator I) {
 
         Range r1 = ra->getRange(I->getOperand(0));
         Range r2 = ra->getRange(I->getOperand(1));
 
+        errs() << *I << "\n";
+        errs() << "[" << r1.getLower() << "," << r1.getUpper() << "] - [" << r2.getLower() << ", " << r2.getUpper() << "]\n";
+
+        ConstantInt *c;
+
         switch (I->getOpcode()) {
             case Instruction::And:
-            case Instruction::Or:
-            case Instruction::Xor:
-                if (isa<ConstantInt>(I->getOperand(1))) {
-                    ConstantInt *c = dyn_cast<ConstantInt>(I->getOperand(1));
-                    //errs() << "value: " << c->getZExtValue() << "\n";
-                    if (r1.getUpper().sle(r2.getLower())) {
-                        // replace the value
-                        I->replaceAllUsesWith(I->getOperand(0));
+                if (verify_equal(r1, r2)) {
+                    I->replaceAllUsesWith(I->getOperand(0));
+                    dead_instr.push(&*I);
+                } else if (r1.getLower().eq(r1.getUpper())) {
+                    if (r1.getLower() == 0) {
+                        I->replaceAllUsesWith(0);
+                        dead_instr.push(&*I);
+                    } else if (r1.getUpper() == 1 && r2.getLower() == 0
+                        && r2.getUpper() == 1) {
+                        I->replaceAllUsesWith(I->getOperand(1));
                         dead_instr.push(&*I);
                     }
-                }
+                } else if (r2.getLower().eq(r2.getUpper())) {
+                    if (r2.getLower() == 0) {
+                        I->replaceAllUsesWith(0);
+                        dead_instr.push(&*I);
+                    } else if (r1.getUpper() == 1 && r2.getLower() == 0
+                        && r2.getUpper() == 1) {
+                        I->replaceAllUsesWith(I->getOperand(1));
+                        dead_instr.push(&*I);
+                    }
+                return true;
+            case Instruction::Or:
+                break;
+            case Instruction::Xor:
                 break;
             default:
                 break;
@@ -252,7 +276,7 @@ namespace {
                     dead_branch.push(make_pair(I->getParent()->getTerminator(), 1));
                     return true;
                 } 
-                // r1.1 >= r2.2 means always false
+                // r1.1 >= r2.2 means always false, remove the true condition
                 if (r1.getLower().sge(r2.getUpper())) { 
                     dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
                     return true;
@@ -294,7 +318,7 @@ namespace {
                 break;
             case CmpInst::ICMP_EQ: // r1 == r2 
                 // if always true, remove the false condition
-                if (r1 == r2) {
+                if (verify_equal(r1, r2)) {
                     dead_branch.push(make_pair(I->getParent()->getTerminator(), 1));
                     return true;
                 } 
@@ -306,13 +330,12 @@ namespace {
                 break;
             case CmpInst::ICMP_NE: // r1 != r2
                 // if always true, remove the false condition
-                if (r1 != r2) { 
+                if (r1.getUpper().slt(r2.getLower()) || r2.getUpper().slt(r1.getLower())) {  
                     dead_branch.push(make_pair(I->getParent()->getTerminator(), 1)); 
                     return true;
                 }
                 // r1.2 == r2.2 && r1.1 == r1.2 && r2.1 == r2.2 means always false
-                if (r1.getUpper().eq(r2.getUpper()) && r1.getLower().eq(r1.getUpper()) &&
-                    r2.getLower().eq(r2.getUpper())) {
+                if (verify_equal(r1, r2)) {
                     dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
                     return true;
                 } 

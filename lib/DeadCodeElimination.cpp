@@ -290,11 +290,11 @@ namespace {
                     return true;
                 break;
             case CmpInst::ICMP_SGT: // r1 > r2
-                if (r1.getUpper().sle(r2.getLower())) // r2.2 >= r1.1
+                if (r1.getUpper().sle(r2.getLower())) // r1.2 >= r1.1
                     return true;
                 break;
             case CmpInst::ICMP_SGE: // r1 >= r2
-                if (r1.getUpper().slt(r2.getLower())) // r2.2 > r1.1
+                if (r1.getUpper().slt(r2.getLower())) // r1.2 < r2.1
                     return true;
                 break;
             case CmpInst::ICMP_EQ: // r1 == r2 
@@ -304,7 +304,7 @@ namespace {
                 }
                 break;
             case CmpInst::ICMP_NE: // r1 != r2
-                // discutir com o grupo!!!
+                // r1.2 == r2.2 && r1.1 == r1.2 && r2.1 == r2.2
                 if (r1.getUpper().eq(r2.getUpper()) && r1.getLower().eq(r1.getUpper()) &&
                     r2.getUpper().eq(r1.getLower())) {
                     return true;

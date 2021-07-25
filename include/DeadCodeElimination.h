@@ -30,14 +30,12 @@ namespace {
             bool eliminate_unconditional_branch(Function &F);
             bool runOnFunction(Function &);
             bool runOnBasicBlock(Function::iterator &);
-            StringRef getLabel(const Value *v);
             bool solveICmpInstruction(ICmpInst* I);
             bool solveBinaryInst(BasicBlock::iterator I);
         private:
             InterProceduralRA<Cousot>* ra;
-            queue<BasicBlock::iterator> dead_instr;
-            queue<BasicBlock::iterator> dead_branch;
-            queue<Instruction*> trivialDead;
+            queue<Instruction*> dead_instr;
+            queue<pair<Instruction*, int>> dead_branch;
             map<string, string> map_label;
         };
 }

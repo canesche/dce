@@ -6,7 +6,10 @@ LLVM_INSTALL_DIR="/home/canesche/git/llvm-project/build/" # </path/to/llvm/>, if
 
 #ADDING BENCHMARKS WITH SPACE BETWEEN WORDS
 BENCH=(
-	test1 test2 test3 test4 test5 test6 test7 
+	test1 
+	test2 test3 test4 test5 
+	test6 
+	test7 
 	test8
 )
 
@@ -39,7 +42,7 @@ for ((i = 0; i < ${#BENCH[@]}; i++)); do
 	echo ""
 	echo "===-------------------------------------------------------------------------==="
 	echo "Executing the pass for bench: "$EXAMPLE
-	
+
 	# analysis pass
 	$CLANG -Wno-everything -fno-discard-value-names -Xclang -disable-O0-optnone -c -emit-llvm $EXAMPLE".c" -o $EXAMPLE".bc"
 	$LLVM_OPT -instnamer -mem2reg -break-crit-edges $EXAMPLE".bc" -o $EXAMPLE".ll"
@@ -58,4 +61,4 @@ for ((i = 0; i < ${#BENCH[@]}; i++)); do
 done
 
 echo "clean .ll and .bc"
-rm benchmarks/*.ll benchmarks/*.bc benchmarks/*.rbc
+rm benchmarks/*.ll benchmarks/*.bc

@@ -8,11 +8,6 @@ STATISTIC(BasicBlocksEliminated,  "Number of basic blocks entirely eliminated");
 namespace {
 
     RADeadCodeElimination::~RADeadCodeElimination() {}
-
-    StringRef RADeadCodeElimination::getLabel(const Value *v) {
-        StringRef bbName(v->getName());
-        return bbName.str();
-    }
       
     bool RADeadCodeElimination::runOnFunction(Function &F) {
 
@@ -40,12 +35,9 @@ namespace {
             Range r = ra->getRange(v);
             
             if (isInstructionTriviallyDead(&*I)) {
-                trivialDead.push(&*I);
+                dead_instr.push(&*I);
             } else if (ICmpInst *icmpInst = dyn_cast<ICmpInst>(&*I)) {
-                if (solveICmpInstruction(icmpInst)) {
-                    dead_instr.push(I);
-                    dead_branch.push(++I);
-                }
+                solveICmpInstruction(icmpInst);
             } else if (isa<BinaryOperator>(I)) {
                 solveBinaryInst(I);
             }
@@ -65,11 +57,9 @@ namespace {
             for (BasicBlock::iterator I = bb->begin(), IEnd = bb->end(); I != IEnd; ++I) {
                 if (PHINode *phi = dyn_cast<PHINode>(I)) {
                     if (phi->getNumOperands() == 1) {
-                        //if (ConstantInt *ci = dyn_cast<ConstantInt>(phi->getOperand(0))) {
-                            I->replaceAllUsesWith(phi->getOperand(0));
-                            Q.push(I);
-                            change = true;
-                        //}
+                        I->replaceAllUsesWith(phi->getOperand(0));
+                        Q.push(I);
+                        change = true;
                     }
                 }
             }
@@ -127,43 +117,24 @@ namespace {
             } 
 
             BasicBlock *bb_after = bb->getTerminator()->getSuccessor(0); 
-            
-            /*errs() << "ANTES--------------\n";
-            errs() << *bb_before;
-            errs() << *bb;
-            errs() << *bb_after;
-            errs() << "--------------\n";*/
 
             // update phi-node
-            //errs() << "UPDATE PHI\n";
             for (BasicBlock::iterator I = bb_after->begin(), IEnd = bb_after->end(); I != IEnd; ++I) {
                 if (PHINode *phi = dyn_cast<PHINode>(I)) {
                     for (int i = 0; i < phi->getNumOperands(); ++i) {
                         if (phi->getIncomingBlock(i) == bb) {
                             phi->setIncomingBlock(i, bb_before);
                         }
-                    }
-                    
+                    } 
                 }
             }
-            //errs() << "------------\n";
 
             bb_before->getTerminator()->setSuccessor(j, bb->getTerminator()->getSuccessor(0));
-            //bb->getTerminator()->replaceSuccessorWith(bb_after, nullptr);
-            //bb->removeFromParent();
-
 
             if (!bb->getTerminator()->use_empty()) {
                 bb->getTerminator()->replaceAllUsesWith(UndefValue::get(bb->getTerminator()->getType()));
             }
             bb->getTerminator()->eraseFromParent();
-            //bb->removeFromParent();
-
-            /*errs() << "DEPOIS--------------\n";
-            errs() << *bb_before;
-            errs() << *bb;
-            errs() << *bb_after;
-            errs() << "--------------\n";*/
             
             ++BasicBlocksEliminated;
             EliminateUnreachableBlocks(F, nullptr, true);
@@ -187,7 +158,7 @@ namespace {
                     if (r1.getUpper().sle(r2.getLower())) {
                         // replace the value
                         I->replaceAllUsesWith(I->getOperand(0));
-                        dead_instr.push(I);
+                        dead_instr.push(&*I);
                     }
                 }
                 break;
@@ -200,19 +171,19 @@ namespace {
     void RADeadCodeElimination::eliminate_branch(Function &F) {
         bool change = false;
         
-        BasicBlock::iterator I;
+        Instruction* I;
+        int succ;
         while (!dead_branch.empty()) {
             change = true;
-            I = dead_branch.front();
+
+            I = dead_branch.front().first;
+            succ = dead_branch.front().second;
             dead_branch.pop();
-            
-            errs() << "This is a dead branch\n";
-            errs() << *I << "\n";
 
             BranchInst *Old = dyn_cast<BranchInst>(I);
-            BranchInst *New = BranchInst::Create(Old->getSuccessor(1));
+            BranchInst *New = BranchInst::Create(Old->getSuccessor((succ+1)%2));
             
-            BasicBlock *BB = &(*Old->getSuccessor(0));
+            BasicBlock *BB = &(*Old->getSuccessor(succ));
             queue<BasicBlock*> Q;
             Q.push(BB);
 
@@ -249,18 +220,8 @@ namespace {
 
     void RADeadCodeElimination::eliminate_instructions() {
         
-        Instruction *Inst;
-        while (!trivialDead.empty()) {
-            Inst = trivialDead.front();
-            trivialDead.pop();
-            if (!Inst->use_empty()) {
-                Inst->replaceAllUsesWith(UndefValue::get(Inst->getType()));
-            }
-            Inst->eraseFromParent();
-            InstructionsEliminated++;
-        }
-        
-        BasicBlock::iterator I;
+        Instruction *I;
+        int del_successor;
         while (!dead_instr.empty()) {
             I = dead_instr.front();
             dead_instr.pop();
@@ -270,36 +231,50 @@ namespace {
             I->eraseFromParent();
             InstructionsEliminated++;
         }
+        
     }
 
     bool RADeadCodeElimination::solveICmpInstruction(ICmpInst* I) {
         
         Range r1 = ra->getRange(I->getOperand(0));
         Range r2 = ra->getRange(I->getOperand(1));
+        Instruction *branch;
 
         errs() << *I << "\n";
         errs() << "[" << r1.getLower() << "," << r1.getUpper() << "] - [" << r2.getLower() << ", " << r2.getUpper() << "]\n";
 
         switch (I->getPredicate()){
             case CmpInst::ICMP_SLT: // r1 < r2
-                if (r1.getLower().sge(r2.getUpper())) // r1.1 >= r2.2
+                if (r1.getLower().sge(r2.getUpper())) { // r1.1 >= r2.2
+                    dead_instr.push(I);
+                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
                     return true;
+                }
                 break;
             case CmpInst::ICMP_SLE: // r1 <= r2
                 if (r1.getLower().sgt(r2.getUpper())) // r1.1 > r2.2
+                    dead_instr.push(I);
+                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
                     return true;
                 break;
             case CmpInst::ICMP_SGT: // r1 > r2
-                if (r1.getUpper().sle(r2.getLower())) // r2.2 >= r1.1
+                if (r1.getUpper().sle(r2.getLower())) { // r2.2 >= r1.1
+                    dead_instr.push(I);
+                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
                     return true;
+                }
                 break;
             case CmpInst::ICMP_SGE: // r1 >= r2
                 if (r1.getUpper().slt(r2.getLower())) // r2.2 > r1.1
+                    dead_instr.push(I);
+                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
                     return true;
                 break;
             case CmpInst::ICMP_EQ: // r1 == r2 
                 // r1.2 < r2.1 || r2.2 < r1.1
                 if (r1.getUpper().slt(r2.getLower()) || r2.getUpper().slt(r1.getLower())) { 
+                    dead_instr.push(I);
+                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
                     return true;
                 }
                 break;
@@ -307,7 +282,12 @@ namespace {
                 // r1.2 == r2.2 && r1.1 == r1.2 && r2.1 == r2.2
                 if (r1.getUpper().eq(r2.getUpper()) && r1.getLower().eq(r1.getUpper()) &&
                     r2.getLower().eq(r2.getUpper())) {
+                    dead_instr.push(I);
+                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
                     return true;
+                } else if (r1 != r2) { // if always true, remove the false condition
+                    dead_instr.push(I);
+                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 1)); 
                 }
                 break;
             default:

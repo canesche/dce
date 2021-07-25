@@ -37,7 +37,9 @@ namespace {
             if (isInstructionTriviallyDead(&*I)) {
                 dead_instr.push(&*I);
             } else if (ICmpInst *icmpInst = dyn_cast<ICmpInst>(&*I)) {
-                solveICmpInstruction(icmpInst);
+                if (solveICmpInstruction(icmpInst)) {
+                    dead_instr.push(icmpInst);
+                }
             } else if (isa<BinaryOperator>(I)) {
                 solveBinaryInst(I);
             }
@@ -245,50 +247,75 @@ namespace {
 
         switch (I->getPredicate()){
             case CmpInst::ICMP_SLT: // r1 < r2
-                if (r1.getLower().sge(r2.getUpper())) { // r1.1 >= r2.2
-                    dead_instr.push(I);
+                // if always true, remove the false condition
+                if (r1.getUpper().slt(r2.getLower())) {
+                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 1));
+                    return true;
+                } 
+                // r1.1 >= r2.2 means always false
+                if (r1.getLower().sge(r2.getUpper())) { 
                     dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
                     return true;
                 }
                 break;
             case CmpInst::ICMP_SLE: // r1 <= r2
-                if (r1.getLower().sgt(r2.getUpper())) // r1.1 > r2.2
-                    dead_instr.push(I);
+                // if always true, remove the false condition
+                if (r1.getUpper().sle(r2.getLower())) {
+                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 1));
+                    return true;
+                } 
+                // r1.1 > r2.2 means always false
+                if (r1.getLower().sgt(r2.getUpper()))
                     dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
                     return true;
                 break;
             case CmpInst::ICMP_SGT: // r1 > r2
-                if (r1.getUpper().sle(r2.getLower())) { // r2.2 >= r1.1
-                    dead_instr.push(I);
+                // if always true, remove the false condition
+                if (r1.getLower().sgt(r2.getUpper())) {
+                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 1));
+                    return true;
+                } 
+                // r2.2 >= r1.1 means always false 
+                if (r1.getUpper().sle(r2.getLower())) { 
                     dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
                     return true;
                 }
                 break;
             case CmpInst::ICMP_SGE: // r1 >= r2
-                if (r1.getUpper().slt(r2.getLower())) // r2.2 > r1.1
-                    dead_instr.push(I);
+                // if always true, remove the false condition
+                if (r1.getLower().sge(r2.getUpper())) {
+                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 1));
+                    return true;
+                }
+                // r2.2 > r1.1 means always false
+                if (r1.getUpper().slt(r2.getLower())) 
                     dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
                     return true;
                 break;
             case CmpInst::ICMP_EQ: // r1 == r2 
-                // r1.2 < r2.1 || r2.2 < r1.1
+                // if always true, remove the false condition
+                if (r1 == r2) {
+                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 1));
+                    return true;
+                } 
+                // r1.2 < r2.1 || r2.2 < r1.1 means always false
                 if (r1.getUpper().slt(r2.getLower()) || r2.getUpper().slt(r1.getLower())) { 
-                    dead_instr.push(I);
                     dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
                     return true;
                 }
                 break;
             case CmpInst::ICMP_NE: // r1 != r2
-                // r1.2 == r2.2 && r1.1 == r1.2 && r2.1 == r2.2
+                // if always true, remove the false condition
+                if (r1 != r2) { 
+                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 1)); 
+                    return true;
+                }
+                // r1.2 == r2.2 && r1.1 == r1.2 && r2.1 == r2.2 means always false
                 if (r1.getUpper().eq(r2.getUpper()) && r1.getLower().eq(r1.getUpper()) &&
                     r2.getLower().eq(r2.getUpper())) {
-                    dead_instr.push(I);
                     dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
                     return true;
-                } else if (r1 != r2) { // if always true, remove the false condition
-                    dead_instr.push(I);
-                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 1)); 
-                }
+                } 
                 break;
             default:
                 return false;

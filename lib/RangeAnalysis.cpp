@@ -12,31 +12,55 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_RANGE false
 #define DEBUG_TYPE "range-analysis"
 
 #include "RangeAnalysis.h"
 
 using namespace llvm;
 
-// These macros are used to get stats regarding the precision of our analysis.
-STATISTIC(usedBits, "Initial number of bits.");
-STATISTIC(needBits, "Needed bits.");
-STATISTIC(percentReduction, "Percentage of reduction of the number of bits.");
-STATISTIC(numSCCs, "Number of strongly connected components.");
-STATISTIC(numAloneSCCs, "Number of SCCs containing only one node.");
-STATISTIC(sizeMaxSCC, "Size of largest SCC.");
-STATISTIC(numVars, "Number of variables");
-STATISTIC(numUnknown, "Number of unknown variables");
-STATISTIC(numEmpty, "Number of empty-set variables");
-STATISTIC(numCPlusInf, "Number of variables [c, +inf].");
-STATISTIC(numCC, "Number of variables [c, c].");
-STATISTIC(numMinInfC, "Number of variables [-inf, c].");
-STATISTIC(numMaxRange, "Number of variables [-inf, +inf].");
-STATISTIC(numConstants, "Number of constants.");
-STATISTIC(numZeroUses, "Number of variables without any use.");
-STATISTIC(numNotInt, "Number of variables that are not Integer.");
-STATISTIC(numOps, "Number of operations");
-STATISTIC(maxVisit, "Max number of times a value has been visited.");
+#if DEBUG_RANGE
+  // These macros are used to get stats regarding the precision of our analysis.
+  STATISTIC(usedBits, "Initial number of bits.");
+  STATISTIC(needBits, "Needed bits.");
+  STATISTIC(percentReduction, "Percentage of reduction of the number of bits.");
+  STATISTIC(numSCCs, "Number of strongly connected components.");
+  STATISTIC(numAloneSCCs, "Number of SCCs containing only one node.");
+  STATISTIC(sizeMaxSCC, "Size of largest SCC.");
+  STATISTIC(numVars, "Number of variables");
+  STATISTIC(numUnknown, "Number of unknown variables");
+  STATISTIC(numEmpty, "Number of empty-set variables");
+  STATISTIC(numCPlusInf, "Number of variables [c, +inf].");
+  STATISTIC(numCC, "Number of variables [c, c].");
+  STATISTIC(numMinInfC, "Number of variables [-inf, c].");
+  STATISTIC(numMaxRange, "Number of variables [-inf, +inf].");
+  STATISTIC(numConstants, "Number of constants.");
+  STATISTIC(numZeroUses, "Number of variables without any use.");
+  STATISTIC(numNotInt, "Number of variables that are not Integer.");
+  STATISTIC(numOps, "Number of operations");
+  STATISTIC(maxVisit, "Max number of times a value has been visited.");
+#else
+  int usedBits = 0;
+  int needBits = 0;
+  int percentReduction = 0;
+  int numSCCs = 0;
+  int numAloneSCCs = 0;
+  int sizeMaxSCC = 0;
+  int numVars = 0;
+  int numUnknown = 0;
+  int numEmpty = 0;
+  int numCPlusInf = 0;
+  int numCC = 0;
+  int numMinInfC = 0;
+  int numMaxRange = 0;
+  int numConstants = 0;
+  int numZeroUses = 0;
+  int numNotInt = 0;
+  int numOps = 0;
+  int maxVisit = 0;
+#endif
+
+
 
 
 //The pass ID is no longer necessary in LLVM 8.0. Use it in lower version:

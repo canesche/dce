@@ -1,0 +1,5 @@
+digraph "CFG for 'foo' function" {
+	label="CFG for 'foo' function";
+
+	Node0x55b9432653e0 [shape=record,label="{entry:\l  ret i32 0\l}"];
+}

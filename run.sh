@@ -36,9 +36,12 @@ for ((i = 0; i < ${#BENCH[@]}; i++)); do
 
 	mkdir -p $DIR_RESULT
 
+	echo ""
+	echo "===-------------------------------------------------------------------------==="
 	echo "Executing the pass for bench: "$EXAMPLE
+	
 	# analysis pass
-	$CLANG -fno-discard-value-names -Xclang -disable-O0-optnone -c -emit-llvm $EXAMPLE".c" -o $EXAMPLE".bc"
+	$CLANG -Wno-everything -fno-discard-value-names -Xclang -disable-O0-optnone -c -emit-llvm $EXAMPLE".c" -o $EXAMPLE".bc"
 	$LLVM_OPT -instnamer -mem2reg -break-crit-edges $EXAMPLE".bc" -o $EXAMPLE".ll"
 	   
 	$LLVM_OPT -load $PATH_LIB -vssa $EXAMPLE".ll" -o $EXAMPLE".vssa.ll"
@@ -50,7 +53,8 @@ for ((i = 0; i < ${#BENCH[@]}; i++)); do
 	
 	# generate dot-cfg after
 	$LLVM_OPT -dot-cfg $EXAMPLE".sol.ll" -disable-output
-	dot -Tpdf .foo.dot -o $DIR_RESULT/foo_depois.pdf 
+	dot -Tpdf .foo.dot -o $DIR_RESULT/foo_depois.pdf
+	echo "-------------------------------------------------------------------------------"
 done
 
 echo "clean .ll and .bc"

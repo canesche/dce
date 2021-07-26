@@ -1,5 +1,9 @@
 digraph "CFG for 'foo' function" {
 	label="CFG for 'foo' function";
 
-	Node0x55d2e1b47400 [shape=record,label="{entry:\l  ret i32 0\l}"];
+	Node0x564f17110560 [shape=record,label="{entry:\l  %inc = add nsw i32 0, 1\l  br label %if.then\l}"];
+	Node0x564f17110560 -> Node0x564f17110cf0;
+	Node0x564f17110cf0 [shape=record,label="{if.then:                                          \l  %inc1 = add nsw i32 %inc, 1\l  br label %if.end\l}"];
+	Node0x564f17110cf0 -> Node0x564f17110e50;
+	Node0x564f17110e50 [shape=record,label="{if.end:                                           \l  %add = add nsw i32 10, %inc1\l  ret i32 %add\l}"];
 }

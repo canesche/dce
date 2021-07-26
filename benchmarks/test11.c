@@ -1,14 +1,9 @@
-// Should remove -- dead gtr instruction
-// Range of the left operand is wholly to the left of the right
-// operand
+// Should not remove -- alive sle instruction
+// Range of the two operands overlap
 int foo() {
-    int k = 0;
-    while (k < 100) {
-        k = k + 1;
-    }
-    k = 0;
-    if (k > 200) { // Dead code
-        printf("Hello World\n");
-    }
-    return 0;
+  int a, b;
+  for (a = 0; a < 100; ++a);
+  for (b = 400; b > -100; --b);
+  
+  return a <= b ? 0 : 1; // Alive conditional
 }

@@ -1,14 +1,10 @@
-// Should remove -- dead slt instruction
-// Range of the left operand totally to the left of the range of the
-// right operand. Thus, the condition will always hold. The check
-// should be removed.
-int foo(int a, int b) {
-  a = 1;
-  b = 2147483647;
-    
-  if (a < b) { // Dead code (a = 1, b = 2147483647)
-    a = a + b;
-  }
+// Should remove -- trivially dead code
+// Instruction doesn't do anything, trivially!
+int foo(int a) {
+    a = 0;
+    int b = 10;
 
-  return a << b << (b >> 2);
+    a + b; // Trivially dead code
+
+    return 0;
 }

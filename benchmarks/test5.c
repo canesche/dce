@@ -1,17 +1,11 @@
-// Should remove -- dead eq instruction
-// Disjunct operand ranges
-void foo(int a, int b) {
+// Should not remove -- alive neq instruction
+// Ranges of operands collapse over more than one number
+int foo(int a, int b) {
     a = 0;
     b = 60;
     
-    while (b > 53) {
-        b--;
-        while (a < 52) {
-            a++;
-            if (a == b) { // Dead code
-                printf("loooll\n");
-                break;
-            }
-        }
+    if (a != b) { // Alive (a = 0, b = 60)
+        return 0;
     }
+    return 1;
 }

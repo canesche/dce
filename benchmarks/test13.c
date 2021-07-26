@@ -1,14 +1,22 @@
-// Should remove -- dead sle instruction
-// Ranges only overlap over one integer. That means that the
-// conditional will always be true.
-int foo() {
-  int a, b;
-  for (a = 0; a < 100; ++a);
-  for (b = 400; b > 250; --b) {
-    if (a <= b) { // Dead code (I[a] = [100, 250], 
-                  //            I[b] = [250, 400])
-      ++a;
+// Should not remove -- alive slt instruction
+// I believe the innermost check is alive (i.e. cannot be removed
+// safely)
+int foo(int a, int b) {
+  a = 1;
+  b = 0;
+  
+  // This is some really crazy code.
+  while (a < 500) {
+    a++;
+    b = 2147483647;
+    while (b > 0) {
+      b -= a;
+
+      if (a < b) { // Probably alive?
+        a = a + b;
+      }
     }
   }
-  return a + b;
+
+  return a << b << (b >> 2);
 }

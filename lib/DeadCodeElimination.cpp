@@ -65,8 +65,8 @@ namespace {
                     send_to_delete_instruction(icmpInst);
                 }
             } 
-            
-            /*if (!r.isUnknown()) {
+            /*
+            if (!r.isUnknown()) {
                 r.print(errs());
                 errs() << *I << "\n";
             }*/
@@ -387,11 +387,11 @@ namespace {
             case CmpInst::ICMP_NE: // r1 != r2
                 // if always true, remove the false condition
                 if (r1.getUpper().slt(r2.getLower()) || r2.getUpper().slt(r1.getLower())) {  
-                    return send_to_delete_branch(I, 1);
+                    return send_to_delete_branch(I, 0);
                 }
                 // r1.2 == r2.2 && r1.1 == r1.2 && r2.1 == r2.2 means always false
                 if (verify_equal(r1, r2)) {
-                    return send_to_delete_branch(I, 0);
+                    return send_to_delete_branch(I, 1);
                 } 
                 break;
             default:
@@ -401,6 +401,7 @@ namespace {
     }
 
     bool RADeadCodeElimination::send_to_delete_branch(Instruction *I, int operand) {
+        //errs() << "Opcode: " << I->getParent()->getTerminator()->getOpcode() << "\n";
         if (I->getParent()->getTerminator()->getOpcode() == Instruction::Ret)
             return false;
         dead_branch.push(make_pair(I->getParent()->getTerminator(), operand));

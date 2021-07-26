@@ -1,10 +1,10 @@
-// Should not remove -- alive neq instruction
-// Ranges of operands collapse over more than one number
+// Should remove -- dead neq instruction
+// Ranges of operands are the same
 int foo(int a, int b) {
-    a = 0;
-    b = 60;
+    a = 1;
+    b = 1;
     
-    if (a != b) { // Alive (a = 0, b = 60)
+    if (a != b) { // Dead code
         return 0;
     }
     return 1;

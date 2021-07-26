@@ -1,13 +1,13 @@
-// Should not remove -- alive sge instruction
-// Left limit of right operand is greater or equal than right limit
-// of left operand
-void foo(int a, int b) {
-  a = 0;
-  b = 63;
-  while (a < 077) {
-    a++;
-    if (a >= b) { // Alive (a = 63, b = 63)
-      printf("a sge b");
+// Should remove -- dead sge instruction
+// Range of left operand indicates that it is always greater or
+// equal than the right operand. Thus, performing the check is
+// unnecessary.
+int foo(int a, int b) {
+    a = 0;
+    b = 60;
+    
+    if (b >= a) {
+        return 0;
     }
-  }
+    return 1;
 }

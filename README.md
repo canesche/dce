@@ -34,8 +34,12 @@ For run all fine, It's necessary the use of LLVM build from the git.
 
 # How to use
 
-To compile and run the program, execute the "run.sh" shellscript
+To compile and run the program, execute the "run.sh" shell script.
 
 # Results
 
-All dot files generated are shown on the results file.
+All dot files generated are shown on the "results" file. With the dot before and after executing the pass. The number of instructions and block basic elimination can be viewed on executing the "run.sh" shell script.
+
+# Observation
+
+We use the name of the function ‘foo’ only to create the dot cfg using the pass of “-dot-cfg” automatically.

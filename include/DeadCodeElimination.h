@@ -24,8 +24,8 @@ namespace {
             RADeadCodeElimination() : FunctionPass(ID) { }
             ~RADeadCodeElimination();
             void getAnalysisUsage(AnalysisUsage &AU) const;
-            void eliminate_instructions();
-            void eliminate_branch(Function &F);
+            bool eliminate_instructions();
+            bool eliminate_branch(Function &F);
             bool eliminate_phi_nodes(Function &F);
             bool eliminate_unconditional_branch(Function &F);
             bool runOnFunction(Function &);
@@ -33,9 +33,11 @@ namespace {
             bool solveICmpInstruction(ICmpInst* I);
             bool solveBinaryInst(BasicBlock::iterator I);
             bool verify_equal(Range r1, Range r2);
+            bool send_to_delete_instruction(Instruction *I);
         private:
             InterProceduralRA<Cousot>* ra;
-            queue<Instruction*> dead_instr;
+            list<Instruction*> dead_instr;
+            list<pair<Instruction*, Value *>> dead_op_bin;
             queue<pair<Instruction*, int>> dead_branch;
             map<string, string> map_label;
         };

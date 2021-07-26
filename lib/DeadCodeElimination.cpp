@@ -14,16 +14,22 @@ namespace {
         ra = &getAnalysis<InterProceduralRA<Cousot>>();
         InstructionsEliminated = 0;
         BasicBlocksEliminated = 0;
+        
+        bool change; 
+        //while (true) {
+            errs() << "ROLEIIII\n";
+            change = false;
+            for (Function::iterator bb = F.begin(), bbEnd = F.end(); bb != bbEnd; ++bb) {
+                runOnBasicBlock(bb);
+            }
+            // eliminate dead instructions 
+            change |= eliminate_instructions();
 
-        for (Function::iterator bb = F.begin(), bbEnd = F.end(); bb != bbEnd; ++bb) {
-            runOnBasicBlock(bb);
-        }
+            // eliminate dead branch 
+            change |= eliminate_branch(F);
 
-        // eliminate dead instructions 
-        eliminate_instructions();
-
-        // eliminate dead branch 
-        eliminate_branch(F);
+        //    if (!change) break;
+        //} 
 
         return false;
     }
@@ -35,14 +41,16 @@ namespace {
             Range r = ra->getRange(v);
             
             if (isInstructionTriviallyDead(&*I)) {
-                dead_instr.push(&*I);
-            } else if (ICmpInst *icmpInst = dyn_cast<ICmpInst>(&*I)) {
-                if (solveICmpInstruction(icmpInst)) {
-                    dead_instr.push(icmpInst);
-                }
-            } else if (isa<BinaryOperator>(I)) {
+                send_to_delete_instruction(&*I); 
+            } 
+            if (isa<BinaryOperator>(I)) {
                 solveBinaryInst(I);
             }
+            if (ICmpInst *icmpInst = dyn_cast<ICmpInst>(&*I)) {
+                if (solveICmpInstruction(icmpInst)) {
+                    send_to_delete_instruction(&*I);
+                }
+            } 
 
             if (!r.isUnknown()) {
                 r.print(errs());
@@ -158,35 +166,56 @@ namespace {
         errs() << *I << "\n";
         errs() << "[" << r1.getLower() << "," << r1.getUpper() << "] - [" << r2.getLower() << ", " << r2.getUpper() << "]\n";
 
-        ConstantInt *c;
-
         switch (I->getOpcode()) {
             case Instruction::And:
                 if (verify_equal(r1, r2)) {
-                    I->replaceAllUsesWith(I->getOperand(0));
-                    dead_instr.push(&*I);
+                    dead_op_bin.push_back(make_pair(&*I, I->getOperand(0)));
+                    return true;
                 } else if (r1.getLower().eq(r1.getUpper())) {
                     if (r1.getLower() == 0) {
-                        I->replaceAllUsesWith(0);
-                        dead_instr.push(&*I);
+                        dead_op_bin.push_back(make_pair(&*I, I->getOperand(0)));
+                        return true;
                     } else if (r1.getUpper() == 1 && r2.getLower() == 0
                         && r2.getUpper() == 1) {
-                        I->replaceAllUsesWith(I->getOperand(1));
-                        dead_instr.push(&*I);
+                        dead_op_bin.push_back(make_pair(&*I, I->getOperand(1)));
+                        return true;
                     }
                 } else if (r2.getLower().eq(r2.getUpper())) {
                     if (r2.getLower() == 0) {
-                        I->replaceAllUsesWith(0);
-                        dead_instr.push(&*I);
+                        dead_op_bin.push_back(make_pair(&*I, I->getOperand(1)));
+                        return true;
+                    } else if (r2.getUpper() == 1 && r1.getLower() == 0
+                        && r1.getUpper() == 1) {
+                        dead_op_bin.push_back(make_pair(&*I, I->getOperand(0)));
+                        return true;
+                    }
+                }
+                return false;
+                break;
+            case Instruction::Or:
+                if (verify_equal(r1, r2)) {
+                    dead_op_bin.push_back(make_pair(&*I, I->getOperand(0)));
+                    return true;
+                } else if (r1.getLower().eq(r1.getUpper())) {
+                    if (r1.getLower() == 0) {
+                        dead_op_bin.push_back(make_pair(&*I, I->getOperand(1)));
+                        return true;
                     } else if (r1.getUpper() == 1 && r2.getLower() == 0
                         && r2.getUpper() == 1) {
-                        I->replaceAllUsesWith(I->getOperand(1));
-                        dead_instr.push(&*I);
+                        dead_op_bin.push_back(make_pair(&*I, I->getOperand(1)));
+                        return true;
                     }
-                return true;
-            case Instruction::Or:
-                break;
-            case Instruction::Xor:
+                } else if (r2.getLower().eq(r2.getUpper())) {
+                    if (r2.getLower() == 0) {
+                        dead_op_bin.push_back(make_pair(&*I, I->getOperand(1)));
+                        return true;
+                    } else if (r2.getUpper() == 1 && r1.getLower() == 0
+                        && r1.getUpper() == 1) {
+                        dead_op_bin.push_back(make_pair(&*I, I->getOperand(1)));
+                        return true;
+                    }
+                }
+                return false;
                 break;
             default:
                 break;
@@ -194,9 +223,9 @@ namespace {
         return false;
     }
 
-    void RADeadCodeElimination::eliminate_branch(Function &F) {
-        bool change = false;
+    bool RADeadCodeElimination::eliminate_branch(Function &F) {
         
+        bool change = false;
         Instruction* I;
         int succ;
         while (!dead_branch.empty()) {
@@ -242,22 +271,44 @@ namespace {
             // remove simple blocks with only have unconditional branch 
             eliminate_unconditional_branch(F);
         }
+        return change;
     }
 
-    void RADeadCodeElimination::eliminate_instructions() {
-        
+    bool RADeadCodeElimination::eliminate_instructions() {
+        bool change = false;
+
         Instruction *I;
-        int del_successor;
+        Value *v;
+        while (!dead_op_bin.empty()) {
+            I = dead_op_bin.front().first;
+            v = dead_op_bin.front().second;
+            dead_op_bin.pop_front();
+            
+            if (!I->use_empty()) {
+                I->replaceAllUsesWith(v);
+            }
+
+            I->eraseFromParent();
+            InstructionsEliminated++;
+            change = true;
+        }
+
         while (!dead_instr.empty()) {
             I = dead_instr.front();
-            dead_instr.pop();
+            dead_instr.pop_front();
+
+            errs() << "Inst del: " << *I << "\n";
+            
             if (!I->use_empty()) {
                 I->replaceAllUsesWith(UndefValue::get(I->getType()));
             }
+
             I->eraseFromParent();
             InstructionsEliminated++;
+            change = true;
         }
-        
+
+        return change;       
     }
 
     bool RADeadCodeElimination::solveICmpInstruction(ICmpInst* I) {
@@ -344,6 +395,16 @@ namespace {
                 return false;
         }
         return false;
+    }
+
+    bool RADeadCodeElimination::send_to_delete_instruction(Instruction *I) {
+        
+        for (auto ele : dead_op_bin) { if (ele.first == I) return false; }
+
+        if (find(dead_instr.begin(), dead_instr.end(), I) == dead_instr.end()){
+            dead_instr.push_back(I);
+        }
+        return true;
     }
 
     void RADeadCodeElimination::getAnalysisUsage(AnalysisUsage &AU) const {

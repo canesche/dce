@@ -1,5 +1,12 @@
 digraph "CFG for 'foo' function" {
 	label="CFG for 'foo' function";
 
-	Node0x55f89c9793e0 [shape=record,label="{entry:\l  ret i32 10\l}"];
+	Node0x555a4ff3f5c0 [shape=record,label="{entry:\l  %rem = srem i32 %k, 2\l  %tobool = icmp ne i32 %rem, 0\l  br i1 %tobool, label %if.then, label %entry.if.end_crit_edge\l|{<s0>T|<s1>F}}"];
+	Node0x555a4ff3f5c0:s0 -> Node0x555a4ff3fde0;
+	Node0x555a4ff3f5c0:s1 -> Node0x555a4ff3fe80;
+	Node0x555a4ff3fe80 [shape=record,label="{entry.if.end_crit_edge:                           \l  br label %if.end\l}"];
+	Node0x555a4ff3fe80 -> Node0x555a4ff3ffb0;
+	Node0x555a4ff3fde0 [shape=record,label="{if.then:                                          \l  %inc = add nsw i32 0, 1\l  br label %if.end\l}"];
+	Node0x555a4ff3fde0 -> Node0x555a4ff3ffb0;
+	Node0x555a4ff3ffb0 [shape=record,label="{if.end:                                           \l  %i.0 = phi i32 [ %inc, %if.then ], [ 0, %entry.if.end_crit_edge ]\l  ret i32 %i.0\l}"];
 }

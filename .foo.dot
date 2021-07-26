@@ -1,12 +1,5 @@
 digraph "CFG for 'foo' function" {
 	label="CFG for 'foo' function";
 
-	Node0x558cd724fe70 [shape=record,label="{entry:\l  br label %while.cond\l}"];
-	Node0x558cd724fe70 -> Node0x558cd7250000;
-	Node0x558cd7250000 [shape=record,label="{while.cond:                                       \l  %k.0 = phi i32 [ 0, %entry ], [ %add, %while.body ]\l  %cmp = icmp slt i32 %k.0, 100\l  br i1 %cmp, label %while.body, label %if.end\l|{<s0>T|<s1>F}}"];
-	Node0x558cd7250000:s0 -> Node0x558cd7250770;
-	Node0x558cd7250000:s1 -> Node0x558cd72509d0;
-	Node0x558cd7250770 [shape=record,label="{while.body:                                       \l  %add = add nsw i32 %k.0, 1\l  br label %while.cond\l}"];
-	Node0x558cd7250770 -> Node0x558cd7250000;
-	Node0x558cd72509d0 [shape=record,label="{if.end:                                           \l  ret i32 0\l}"];
+	Node0x55d2e1b47400 [shape=record,label="{entry:\l  ret i32 0\l}"];
 }

@@ -1,6 +1,20 @@
-#include "DeadCodeElimination.h"
+//===----------------------- DeadCodeElimination.cpp ----------------------===//
+//=== Performs a dead code elimination of the instruction of the function -===//
+//
+//					 The LLVM Compiler Infrastructure
+//
+// This file is distributed under the MIT Open Source
+// License. See LICENSE.TXT for details.
+//
+// Copyright (C) 2021 Michael Canesche
+//                    Caio Vinícius Raposo Ribeiro
+//                    Alexander Thomas Mol Holquist
+//      
+//===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "dce"
+
+#include "DeadCodeElimination.h"
 
 STATISTIC(InstructionsEliminated, "Number of instructions eliminated");
 STATISTIC(BasicBlocksEliminated,  "Number of basic blocks entirely eliminated");
@@ -14,15 +28,24 @@ namespace {
         ra = &getAnalysis<InterProceduralRA<Cousot>>();
         InstructionsEliminated = 0;
         BasicBlocksEliminated = 0;
+        bool change = false;
         
         for (Function::iterator bb = F.begin(), bbEnd = F.end(); bb != bbEnd; ++bb) {
             runOnBasicBlock(bb);
         }
         // eliminate dead instructions 
-        eliminate_instructions();
+        change |= eliminate_instructions(F);
 
         // eliminate dead branch 
-        eliminate_branch(F);
+        change |= eliminate_branch(F);
+
+        if (change) { // eliminate 
+            // eliminate PHI-nodes with one operand
+            eliminate_phi_nodes(F);
+
+            // remove simple blocks with only have unconditional branch 
+            eliminate_unconditional_branch(F);
+        }
 
         return false;
     }
@@ -35,27 +58,27 @@ namespace {
             
             if (isInstructionTriviallyDead(&*I)) {
                 send_to_delete_instruction(&*I); 
-            } 
-            if (isa<BinaryOperator>(I)) {
+            } else if (isa<BinaryOperator>(I)) {
                 solveBinaryInst(I);
-            }
-            if (ICmpInst *icmpInst = dyn_cast<ICmpInst>(&*I)) {
+            } else if (ICmpInst *icmpInst = dyn_cast<ICmpInst>(&*I)) {
                 if (solveICmpInstruction(icmpInst)) {
-                    send_to_delete_instruction(&*I);
+                    send_to_delete_instruction(icmpInst);
                 }
             } 
-
-            if (!r.isUnknown()) {
+            
+            /*if (!r.isUnknown()) {
                 r.print(errs());
                 errs() << *I << "\n";
-            }
+            }*/
         }
         return false;
     }
 
     bool RADeadCodeElimination::eliminate_phi_nodes(Function &F) {
+        
         queue<BasicBlock::iterator> Q;
         bool change = false;
+        
         for (Function::iterator bb = F.begin(), bbEnd = F.end(); bb != bbEnd; ++bb) {
             for (BasicBlock::iterator I = bb->begin(), IEnd = bb->end(); I != IEnd; ++I) {
                 if (PHINode *phi = dyn_cast<PHINode>(I)) {
@@ -84,8 +107,6 @@ namespace {
     bool RADeadCodeElimination::eliminate_unconditional_branch(Function &F) {
         bool change = false;
         int count;
-
-        //errs() << "ELIMINARION UNCONDITIONAL\n"; 
 
         queue<BasicBlock*> Q;
         for (BasicBlock &bb : F) {
@@ -156,9 +177,9 @@ namespace {
         Range r1 = ra->getRange(I->getOperand(0));
         Range r2 = ra->getRange(I->getOperand(1));
 
-        errs() << *I << "\n";
+        /*errs() << *I << "\n";
         errs() << "[" << r1.getLower() << "," << r1.getUpper() << "] - [" << r2.getLower() << ", " << r2.getUpper() << "]\n";
-
+        */
         switch (I->getOpcode()) {
             case Instruction::And:
                 if (verify_equal(r1, r2)) {
@@ -255,11 +276,11 @@ namespace {
         }
 
         if (change) {
-            // eliminate unreachable block from entry
-            EliminateUnreachableBlocks(F, nullptr, true);
-
             // eliminate PHI-nodes with one operand
             eliminate_phi_nodes(F);
+
+            // eliminate unreachable block from entry
+            EliminateUnreachableBlocks(F, nullptr, true);
             
             // remove simple blocks with only have unconditional branch 
             eliminate_unconditional_branch(F);
@@ -267,7 +288,7 @@ namespace {
         return change;
     }
 
-    bool RADeadCodeElimination::eliminate_instructions() {
+    bool RADeadCodeElimination::eliminate_instructions(Function &F) {
         bool change = false;
 
         Instruction *I;
@@ -289,8 +310,6 @@ namespace {
         while (!dead_instr.empty()) {
             I = dead_instr.front();
             dead_instr.pop_front();
-
-            errs() << "Inst del: " << *I << "\n";
             
             if (!I->use_empty()) {
                 I->replaceAllUsesWith(UndefValue::get(I->getType()));
@@ -306,88 +325,86 @@ namespace {
 
     bool RADeadCodeElimination::solveICmpInstruction(ICmpInst* I) {
         
+        ra = &getAnalysis<InterProceduralRA<Cousot>>();
         Range r1 = ra->getRange(I->getOperand(0));
         Range r2 = ra->getRange(I->getOperand(1));
         Instruction *branch;
 
-        errs() << *I << "\n";
+        /*errs() << *I << "\n";
         errs() << "[" << r1.getLower() << "," << r1.getUpper() << "] - [" << r2.getLower() << ", " << r2.getUpper() << "]\n";
-
+        */
         switch (I->getPredicate()){
             case CmpInst::ICMP_SLT: // r1 < r2
                 // if always true, remove the false condition
                 if (r1.getUpper().slt(r2.getLower())) {
-                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 1));
-                    return true;
+                    return send_to_delete_branch(I, 1);
                 } 
                 // r1.1 >= r2.2 means always false, remove the true condition
                 if (r1.getLower().sge(r2.getUpper())) { 
-                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
-                    return true;
+                    return send_to_delete_branch(I, 0);
                 }
                 break;
             case CmpInst::ICMP_SLE: // r1 <= r2
                 // if always true, remove the false condition
                 if (r1.getUpper().sle(r2.getLower())) {
-                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 1));
-                    return true;
+                    return send_to_delete_branch(I, 1);
                 } 
                 // r1.1 > r2.2 means always false
-                if (r1.getLower().sgt(r2.getUpper()))
-                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
-                    return true;
+                if (r1.getLower().sgt(r2.getUpper())) {
+                    return send_to_delete_branch(I, 0);
+                }
                 break;
             case CmpInst::ICMP_SGT: // r1 > r2
                 // if always true, remove the false condition
                 if (r1.getLower().sgt(r2.getUpper())) {
-                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 1));
-                    return true;
+                    return send_to_delete_branch(I, 1);
                 } 
                 // r2.2 >= r1.1 means always false 
                 if (r1.getUpper().sle(r2.getLower())) { 
-                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
-                    return true;
+                    return send_to_delete_branch(I, 0);
                 }
                 break;
             case CmpInst::ICMP_SGE: // r1 >= r2
                 // if always true, remove the false condition
                 if (r1.getLower().sge(r2.getUpper())) {
-                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 1));
-                    return true;
+                    return send_to_delete_branch(I, 1);
                 }
                 // r2.2 > r1.1 means always false
-                if (r1.getUpper().slt(r2.getLower())) 
-                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
-                    return true;
+                if (r1.getUpper().slt(r2.getLower())) {
+                    return send_to_delete_branch(I, 0);
+                }
                 break;
             case CmpInst::ICMP_EQ: // r1 == r2 
                 // if always true, remove the false condition
                 if (verify_equal(r1, r2)) {
-                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 1));
-                    return true;
+                    return send_to_delete_branch(I, 1);
                 } 
                 // r1.2 < r2.1 || r2.2 < r1.1 means always false
                 if (r1.getUpper().slt(r2.getLower()) || r2.getUpper().slt(r1.getLower())) { 
-                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
-                    return true;
+                    return send_to_delete_branch(I, 0);
                 }
                 break;
             case CmpInst::ICMP_NE: // r1 != r2
                 // if always true, remove the false condition
                 if (r1.getUpper().slt(r2.getLower()) || r2.getUpper().slt(r1.getLower())) {  
-                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 1)); 
-                    return true;
+                    return send_to_delete_branch(I, 1);
                 }
                 // r1.2 == r2.2 && r1.1 == r1.2 && r2.1 == r2.2 means always false
                 if (verify_equal(r1, r2)) {
-                    dead_branch.push(make_pair(I->getParent()->getTerminator(), 0));
-                    return true;
+                    return send_to_delete_branch(I, 0);
                 } 
                 break;
             default:
                 return false;
         }
         return false;
+    }
+
+    bool RADeadCodeElimination::send_to_delete_branch(Instruction *I, int operand) {
+        if (I->getParent()->getTerminator()->getOpcode() == Instruction::Ret)
+            return false;
+        dead_branch.push(make_pair(I->getParent()->getTerminator(), operand));
+        return true;
     }
 
     bool RADeadCodeElimination::send_to_delete_instruction(Instruction *I) {

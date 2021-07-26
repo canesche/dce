@@ -1,7 +1,7 @@
 set -e
 
 # CONFIG WHERE YOUR LLVM INSTALL, REQUIRE VERSION COMPILE FROM GIT
-LLVM_INSTALL_DIR="/home/canesche/git/llvm-project/build/" # </path/to/llvm/>, if you use binary installation, you can leave empty this string 
+LLVM_INSTALL_DIR="/home/canesche/git/llvm-project/build/" # </path/to/llvm/>
 
 # DON'T NEED CHANGE BELOW IF YOU COMPILE FROM GIT
 LLVM_OPT=$LLVM_INSTALL_DIR"/bin/opt" # </path/to/opt>
@@ -11,7 +11,9 @@ CLANG=$LLVM_INSTALL_DIR"/bin/clang" # </path/to/clang>
 BENCH=(
 	test1 test2 test3 test4 test5 
 	test6 test7 test8 test9 test10 
-	test11 test12 test13 test14 
+	test11 
+	test12 
+	test13 test14 
 	test15 test16
 )
 
@@ -46,11 +48,12 @@ for ((i = 0; i < ${#BENCH[@]}; i++)); do
 	$LLVM_OPT -instnamer -mem2reg -break-crit-edges $EXAMPLE".bc" -o $EXAMPLE".ll"
 	   
 	$LLVM_OPT -load $PATH_LIB -vssa $EXAMPLE".ll" -o $EXAMPLE".vssa.ll"
-	$LLVM_OPT -stats -load $PATH_LIB -dead-code-elimination $EXAMPLE".vssa.ll" -S -o=$EXAMPLE".sol.ll"
-	
+
 	# generate dot-cfg before
 	$LLVM_OPT -dot-cfg $EXAMPLE".vssa.ll" -disable-output
 	dot -Tpdf .foo.dot -o $DIR_RESULT/foo_antes.pdf 
+
+	$LLVM_OPT -stats -load $PATH_LIB -dead-code-elimination $EXAMPLE".vssa.ll" -S -o=$EXAMPLE".sol.ll"
 	
 	# generate dot-cfg after
 	$LLVM_OPT -dot-cfg $EXAMPLE".sol.ll" -disable-output

@@ -15,21 +15,14 @@ namespace {
         InstructionsEliminated = 0;
         BasicBlocksEliminated = 0;
         
-        bool change; 
-        //while (true) {
-            errs() << "ROLEIIII\n";
-            change = false;
-            for (Function::iterator bb = F.begin(), bbEnd = F.end(); bb != bbEnd; ++bb) {
-                runOnBasicBlock(bb);
-            }
-            // eliminate dead instructions 
-            change |= eliminate_instructions();
+        for (Function::iterator bb = F.begin(), bbEnd = F.end(); bb != bbEnd; ++bb) {
+            runOnBasicBlock(bb);
+        }
+        // eliminate dead instructions 
+        eliminate_instructions();
 
-            // eliminate dead branch 
-            change |= eliminate_branch(F);
-
-        //    if (!change) break;
-        //} 
+        // eliminate dead branch 
+        eliminate_branch(F);
 
         return false;
     }

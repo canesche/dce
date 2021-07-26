@@ -1,3 +1,5 @@
+// Should remove -- dead eq instruction
+// Disjunct operand ranges
 void foo(int a, int b) {
     a = 0;
     b = 50;
@@ -6,7 +8,7 @@ void foo(int a, int b) {
     }
     while (b > 10) {
         b--;
-        if (a == b) { // codigo morto
+        if (a == b) { // Dead code
             printf("loooll\n");
             break;
         }

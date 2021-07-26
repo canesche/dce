@@ -3,5 +3,5 @@ int foo(int k) {
   if (k % 2) {
     i++;
   }
-  return i | 0;
+  return i & 1;
 }

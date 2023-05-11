@@ -1,6 +1,6 @@
 # Dead Code Elimination (DCE) using Range Analysis
 
-The goal of this project is to eliminate dead code and simplify the final code. 
+The goal of this project is to eliminate dead code and optimize the final code. 
 
 # Students
 
